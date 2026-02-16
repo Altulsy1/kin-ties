@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6C5CE7">
+  <meta name="description" content="Fruit Clash - العب بمفردك مع روبوتات ذكية أو مع الأصدقاء. واجهة عصرية سلسة.">
+  <title>Fruit Clash · أربعة فواكه</title>
+  <!-- Font Awesome & Google Fonts (مستقرة) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <!-- Firebase (النسخة المدمجة) -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+  <!-- QR + Confetti (خيارات) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
+  <style>
+    /* style-modern.css مُدمج بالكامل + تحسينات للأجهزة الصغيرة */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Cairo', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    :root {
+      --primary: #6C5CE7; --primary-dark: #5649C0; --secondary: #00D2FF;
+      --success: #00B894; --danger: #FF7675; --warning: #FDCB6E;
+      --dark: #2D3436; --light: #F5F6FA; --gray: #95A5A6;
+      --gradient: linear-gradient(135deg, #6C5CE7, #00D2FF);
+      --gradient-danger: linear-gradient(135deg, #FF7675, #FF6B6B);
+      --gradient-success: linear-gradient(135deg, #00B894, #00D2FF);
+      --shadow-sm: 0 5px 15px rgba(0,0,0,0.05);
+      --shadow: 0 10px 30px rgba(108,92,231,0.15);
+      --shadow-lg: 0 20px 40px rgba(0,0,0,0.1);
+      --radius-sm: 12px; --radius: 20px; --radius-lg: 30px;
+      --transition: all 0.3s ease;
+    }
+    body {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    }
+    .screen { width: 100%; max-width: 500px; min-height: 100vh; background: var(--light); position: relative; display: block; }
+    .screen.hidden { display: none !important; }
+    /* شاشة رئيسية بخلفية متحركة */
+    .menu-screen { background: linear-gradient(135deg, #667eea, #764ba2); overflow-y: auto; }
+    .menu-bg-pattern {
+      position: absolute; inset:0;
+      background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%);
+      animation: moveBackground 20s linear infinite; pointer-events: none;
+    }
+    @keyframes moveBackground { 0%{transform:scale(1) rotate(0deg);} 50%{transform:scale(1.05) rotate(1deg);} 100%{transform:scale(1) rotate(0deg);} }
+    .menu-content { position: relative; z-index:2; padding:20px; animation:slideUp 0.5s ease; }
+    @keyframes slideUp { from{opacity:0; transform:translateY(30px);} to{opacity:1; transform:translateY(0);} }
+    .menu-title { font-size:2.8rem; font-weight:900; color:white; text-shadow:0 5px 20px rgba(0,0,0,0.2); text-align:center; margin-bottom:5px; }
+    .menu-version { color:rgba(255,255,255,0.8); font-size:0.9rem; background:rgba(255,255,255,0.1); display:inline-block; padding:5px 15px; border-radius:20px; margin:0 auto 20px; text-align:center; width:fit-content; }
+
+    /* ملف شخصي */
+    .player-profile-card {
+      background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border-radius:var(--radius);
+      padding:15px; margin-bottom:30px; display:flex; align-items:center; gap:15px; border:1px solid rgba(255,255,255,0.2);
+    }
+    .player-avatar { width:70px; height:70px; border-radius:50%; overflow:hidden; border:3px solid white; background:white; }
+    .player-avatar img { width:100%; height:100%; object-fit:cover; }
+    .player-info { flex:1; }
+    .player-name-label { font-size:0.8rem; color:rgba(255,255,255,0.8); }
+    .player-info h3 { color:white; font-size:1.4rem; font-weight:700; }
+    .edit-name-btn { width:45px; height:45px; border:none; background:rgba(255,255,255,0.2); border-radius:50%; color:white; cursor:pointer; }
+
+    /* أزرار رئيسية عصرية */
+    .menu-buttons-modern { display:flex; flex-direction:column; gap:15px; margin-bottom:30px; }
+    .menu-btn { padding:18px; border:none; border-radius:var(--radius); font-size:1.1rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; transition:var(--transition); }
+    .primary-btn { background:white; color:var(--primary); box-shadow:0 10px 30px rgba(108,92,231,0.4); }
+    .secondary-btn { background:rgba(255,255,255,0.15); color:white; border:1px solid rgba(255,255,255,0.3); }
+    .outline-btn { background:transparent; color:white; border:2px solid white; }
+
+    .quick-play-section { margin-bottom:30px; }
+    .section-label { color:rgba(255,255,255,0.8); text-align:center; margin-bottom:15px; }
+    .quick-play-buttons { display:flex; gap:10px; justify-content:center; }
+    .quick-btn { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); padding:12px 25px; border-radius:25px; color:white; cursor:pointer; }
+
+    .online-stats { display:flex; justify-content:center; gap:40px; background:rgba(0,0,0,0.2); border-radius:var(--radius); padding:20px; }
+    .stat-value { display:block; font-size:2rem; font-weight:800; color:white; line-height:1.2; }
+    .stat-label { color:rgba(255,255,255,0.7); font-size:0.9rem; }
+
+    /* شاشة الغرفة (lobby) */
+    .lobby-header { display:flex; justify-content:space-between; align-items:center; padding:20px; background:white; border-radius:0 0 var(--radius-lg) var(--radius-lg); box-shadow:var(--shadow-sm); }
+    .back-btn, .settings-btn { width:45px; height:45px; border:none; background:var(--light); border-radius:var(--radius-sm); color:var(--dark); cursor:pointer; }
+    .room-code-card { background:white; margin:20px; padding:20px; border-radius:var(--radius); display:flex; align-items:center; gap:15px; box-shadow:var(--shadow-sm); }
+    .code-display { flex:1; font-size:2rem; font-weight:900; letter-spacing:5px; color:var(--primary); direction:ltr; text-align:left; }
+    .copy-code-btn { width:50px; height:50px; border:none; background:var(--primary); color:white; border-radius:var(--radius-sm); cursor:pointer; }
+    .qr-share-section { text-align:center; margin:20px; }
+    .qr-preview canvas { width:150px; height:150px; display:block; margin:auto; background:white; padding:10px; border-radius:var(--radius); }
+
+    .players-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px; padding:20px; margin-bottom:90px; }
+    .player-card { background:white; border-radius:var(--radius); padding:20px 10px; text-align:center; box-shadow:var(--shadow-sm); }
+    .player-card.host-card { background:var(--gradient); color:white; }
+    .player-avatar.small { width:50px; height:50px; margin:0 auto 10px; }
+
+    .lobby-footer { position:fixed; bottom:0; left:0; right:0; max-width:500px; margin:0 auto; background:white; padding:20px; border-radius:var(--radius-lg) var(--radius-lg) 0 0; box-shadow:0 -5px 20px rgba(0,0,0,0.05); z-index:100; }
+    .start-btn { width:100%; padding:18px; border:none; border-radius:var(--radius); font-weight:700; cursor:pointer; background:var(--gradient-success); color:white; margin-bottom:15px; }
+    .start-btn.disabled { background:#e9ecef; color:var(--gray); cursor:not-allowed; }
+
+    /* شاشة اللعب */
+    .game-screen { background:linear-gradient(135deg, #667eea, #764ba2); }
+    .game-header-modern { display:flex; justify-content:space-between; align-items:center; padding:20px; background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); }
+    .timer-circle { position:relative; width:70px; height:70px; }
+    .timer-circle svg { width:100%; height:100%; transform:rotate(-90deg); }
+    .timer-progress { fill:none; stroke:white; stroke-width:8; stroke-linecap:round; stroke-dasharray:283; transition:stroke-dashoffset 1s linear; }
+    .timer-text { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:white; font-weight:700; font-size:1.4rem; }
+
+    .cards-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px; margin:20px 0; }
+    .modern-card { background:white; border-radius:var(--radius); padding:20px 5px; display:flex; flex-direction:column; align-items:center; box-shadow:var(--shadow); cursor:pointer; aspect-ratio:2/3; border:2px solid transparent; transition:var(--transition); }
+    .modern-card:hover { transform:translateY(-5px); border-color:var(--primary); }
+    .card-emoji { font-size:3.5rem; margin-bottom:8px; }
+    .card-name { font-weight:600; color:var(--dark); }
+
+    /* تحكم البطاقات (خلط/ترتيب) */
+    .card-controls { display:flex; gap:10px; margin-top:15px; }
+    .control-btn { flex:1; padding:12px; background:rgba(255,255,255,0.2); border:none; border-radius:var(--radius-sm); color:white; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }
+
+    /* تقدم اللاعبين (بما في ذلك AI) */
+    .players-progress { display:flex; gap:10px; overflow-x:auto; padding:10px 0; scrollbar-width:none; }
+    .player-progress-item { min-width:100px; background:rgba(255,255,255,0.1); backdrop-filter:blur(5px); border-radius:var(--radius); padding:10px; text-align:center; color:white; }
+    .progress-avatar { width:40px; height:40px; border-radius:50%; overflow:hidden; margin:0 auto 5px; border:2px solid white; }
+    .progress-avatar img { width:100%; height:100%; object-fit:cover; }
+    .ai-player .progress-avatar { background:linear-gradient(135deg,#4a90e2,#357abd); }
+
+    /* المودال العصري */
+    .modern-modal { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:var(--radius-lg); padding:30px; max-width:350px; width:90%; z-index:2000; box-shadow:var(--shadow-lg); animation:modalPop 0.4s; }
+    @keyframes modalPop { from{opacity:0; transform:translate(-50%,-30%) scale(0.8);} to{opacity:1; transform:translate(-50%,-50%) scale(1);} }
+    .hidden { display:none !important; }
+
+    /* قائمة جانبية */
+    .side-menu { position:fixed; top:0; right:0; width:280px; height:100%; background:white; z-index:3000; box-shadow:-5px 0 30px rgba(0,0,0,0.1); animation:slideInRight 0.3s; display:flex; flex-direction:column; }
+    @keyframes slideInRight { from{transform:translateX(100%);} to{transform:translateX(0);} }
+    .side-menu-header { background:var(--gradient); padding:20px; color:white; }
+    .menu-item { width:100%; padding:15px; border:none; background:none; display:flex; align-items:center; gap:15px; font-size:1rem; cursor:pointer; border-radius:var(--radius-sm); }
+    .menu-item.danger { color:var(--danger); }
+
+    /* تحسينات للأجهزة الصغيرة */
+    @media (max-width:380px) {
+      .menu-title { font-size:2.2rem; }
+      .card-emoji { font-size:2.5rem; }
+      .players-grid { gap:8px; }
+      .player-card { padding:15px 5px; }
+      .code-display { font-size:1.6rem; letter-spacing:3px; }
+    }
+
+    /* إشعار toast */
+    .toast-message { position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(100px); background:rgba(0,0,0,0.8); color:white; padding:12px 24px; border-radius:50px; z-index:4000; transition:all 0.3s; opacity:0; white-space:nowrap; max-width:90%; }
+    .toast-message.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    .toast-success { background:linear-gradient(90deg, var(--success), var(--secondary)); }
+    .toast-error { background:linear-gradient(90deg, var(--danger), #ff8787); }
+
+    /* لوحة المتصدرين داخل المودال */
+    .leaderboard-item { display:flex; align-items:center; gap:10px; padding:10px; background:#f0f0f0; border-radius:var(--radius-sm); margin-bottom:5px; }
+  </style>
+</head>
+<body>
+  <!-- القائمة الرئيسية -->
+  <main id="main-menu" class="screen menu-screen">
+    <div class="menu-bg-pattern"></div>
+    <div class="menu-content">
+      <header class="menu-header"><h1 class="menu-title">Fruit Clash</h1><div class="menu-version">إصدار 1.0</div></header>
+      <section class="player-profile-card">
+        <div class="player-avatar"><img id="menu-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=user" alt=""></div>
+        <div class="player-info"><span class="player-name-label">مرحباً،</span><h3 id="player-name-display">لاعب</h3></div>
+        <button id="edit-name-btn" class="edit-name-btn" onclick="window.game?.editName()"><i class="fas fa-pen"></i></button>
+      </section>
+      <section class="menu-buttons-modern">
+        <button id="create-room-btn" class="menu-btn primary-btn" onclick="window.game?.createRoom()"><i class="fas fa-plus-circle"></i>إنشاء غرفة</button>
+        <button id="join-room-btn" class="menu-btn secondary-btn" onclick="window.game?.showJoinDialog()"><i class="fas fa-sign-in-alt"></i>انضم إلى غرفة</button>
+        <button id="single-player-btn" class="menu-btn outline-btn" onclick="window.game?.startSinglePlayer()"><i class="fas fa-robot"></i>العب بمفردك (ذكاء اصطناعي)</button>
+        <button class="menu-btn outline-btn" onclick="window.game?.showLeaderboardModal()"><i class="fas fa-trophy"></i>المتصدرين</button>
+      </section>
+      <section class="quick-play-section">
+        <div class="section-label">تشغيل سريع</div>
+        <div class="quick-play-buttons">
+          <button class="quick-btn" onclick="window.game?.quickJoinRandom()"><i class="fas fa-random"></i>انضمام عشوائي</button>
+          <button class="quick-btn" onclick="window.game?.showTutorial()"><i class="fas fa-question-circle"></i>شرح اللعبة</button>
+        </div>
+      </section>
+      <section class="online-stats">
+        <div class="stat-item"><span class="stat-value" id="online-count">156</span><span class="stat-label">متصل</span></div>
+        <div class="stat-item"><span class="stat-value" id="games-count">42</span><span class="stat-label">جارية</span></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- شاشة الغرفة (lobby) -->
+  <section id="lobby-screen" class="screen lobby-screen hidden">
+    <header class="lobby-header"><button class="back-btn" onclick="window.game?.leaveRoom()"><i class="fas fa-arrow-right"></i></button><h2>غرفة الانتظار</h2><button class="settings-btn" onclick="window.game?.showSettings()"><i class="fas fa-cog"></i></button></header>
+    <div class="room-code-card"><span class="code-label">رمز الغرفة</span><span class="code-display" id="room-code">----</span><button class="copy-code-btn" onclick="window.game?.copyRoomCode()"><i class="fas fa-copy"></i></button></div>
+    <div class="qr-share-section"><div id="qr-code-container" class="qr-preview"><canvas id="qr-code"></canvas></div><div class="qr-hint"><i class="fas fa-camera"></i>امسح للانضمام</div></div>
+    <div class="players-grid" id="players-grid"></div>
+    <footer class="lobby-footer"><button id="start-game-btn" class="start-btn disabled" disabled>🚀 ابدأ اللعبة</button><div style="display:flex; justify-content:space-between;"><div class="player-count" id="player-count">1/4</div><div><button class="invite-btn" onclick="window.game?.shareInvite()"><i class="fas fa-share-alt"></i></button></div></div></footer>
+  </section>
+
+  <!-- شاشة اللعب الرئيسية -->
+  <section id="game-screen" class="screen game-screen hidden">
+    <header class="game-header-modern"><div class="round-info"><span class="round-badge"><i class="fas fa-trophy"></i> جولة <span id="round-number">1</span></span></div>
+      <div class="timer-circle"><svg viewBox="0 0 100 100"><circle class="timer-bg" cx="50" cy="50" r="45" stroke="rgba(255,255,255,0.2)" stroke-width="8" fill="none"/><circle id="timer-progress" class="timer-progress" cx="50" cy="50" r="45" stroke="white" stroke-width="8" fill="none" stroke-dasharray="283" stroke-dashoffset="0"/></svg><div class="timer-text"><span id="game-timer">60</span></div></div>
+      <button class="menu-dots-btn" onclick="window.game?.showSideMenu()"><i class="fas fa-ellipsis-v"></i></button>
+    </header>
+    <div class="game-area">
+      <section class="cards-section">
+        <div class="section-header"><div class="cards-counter"><i class="fas fa-layer-group"></i> <span id="cards-count">0/4</span></div>
+          <button id="done-button" class="win-button disabled" disabled onclick="window.game?.claimWin()"><div class="win-button-inner"><i class="fas fa-check-circle"></i> لقد جمعت 4!</div></button>
+        </div>
+        <div id="cards-container" class="cards-grid"></div>
+        <!-- أزرار ترتيب وخلط البطاقات -->
+        <div class="card-controls">
+          <button class="control-btn" onclick="window.game?.shuffleMyCards()"><i class="fas fa-random"></i> خلط</button>
+          <button class="control-btn" onclick="window.game?.sortMyCards()"><i class="fas fa-sort"></i> ترتيب</button>
+        </div>
+      </section>
+      <div id="players-progress" class="players-progress"></div>
+    </div>
+  </section>
+
+  <!-- مودال النتيجة -->
+  <div id="result-modal" class="modern-modal hidden">
+    <div class="confetti"></div><div class="winner-avatar"><img id="winner-avatar-img" src=""></div>
+    <h2 id="result-title" class="winner-title">🎉 فائز!</h2><p id="result-message" class="winner-message"></p>
+    <div class="winner-stats"><div class="winner-stat"><span class="stat-value" id="round-time">0</span><span class="stat-label">ثانية</span></div><div class="winner-stat"><span class="stat-value" id="win-streak">0</span><span class="stat-label">فوز متتالي</span></div></div>
+    <div class="modal-actions"><button id="next-round-btn" class="modal-btn primary" onclick="window.game?.nextRound()"><i class="fas fa-forward"></i> التالية</button><button id="end-game-btn" class="modal-btn secondary" onclick="window.game?.endGame()"><i class="fas fa-home"></i> القائمة</button></div>
+  </div>
+
+  <!-- القائمة الجانبية -->
+  <aside id="side-menu" class="side-menu hidden"><div class="side-menu-header"><div class="close-menu" onclick="window.game?.closeSideMenu()"><i class="fas fa-times"></i></div><div class="menu-profile"><img id="side-avatar" src=""><div id="menu-player-name">لاعب</div></div></div><div class="side-menu-items"><button class="menu-item" onclick="window.game?.showHowToPlay()"><i class="fas fa-question-circle"></i> كيفية اللعب</button><button class="menu-item" onclick="window.game?.showStatsModal()"><i class="fas fa-chart-bar"></i> إحصائياتي</button><button class="menu-item" onclick="window.game?.shareApp()"><i class="fas fa-share-alt"></i> شارك</button><button class="menu-item danger" onclick="window.game?.leaveRoom()"><i class="fas fa-sign-out-alt"></i> خروج</button></div><div class="side-menu-footer"><span>Fruit Clash v1.0</span></div></aside>
+
+  <!-- مودال اختيار الصعوبة (عند بدء فردي) -->
+  <div id="difficulty-modal" class="modern-modal hidden"><div class="difficulty-selector"><h3>🎮 اختر مستوى الذكاء</h3><div class="difficulty-buttons"><button class="difficulty-btn easy" onclick="window.game?.setAIDifficulty('easy')"><i class="fas fa-smile"></i> سهل</button><button class="difficulty-btn medium" onclick="window.game?.setAIDifficulty('medium')"><i class="fas fa-meh"></i> متوسط</button><button class="difficulty-btn hard" onclick="window.game?.setAIDifficulty('hard')"><i class="fas fa-frown"></i> صعب</button></div><button class="modal-btn secondary" onclick="window.game?.closeDifficultyModal()">إلغاء</button></div></div>
+
+  <!-- مودال لوحة المتصدرين -->
+  <div id="leaderboard-modal" class="modern-modal hidden"><h2 style="margin-bottom:20px;">🏆 المتصدرون</h2><div id="leaderboard-container" style="max-height:300px; overflow-y:auto;"></div><button class="modal-btn secondary" style="margin-top:20px;" onclick="window.game?.closeLeaderboardModal()">إغلاق</button></div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast-message"></div>
+
+  <script>
+    (function(){
+      // كود game-modern.js المُحسّن بالكامل ومدمج هنا مع تفعيل وضع الفردي ضد AI وتحسين شاشات صغيرة
+      class ModernGame {
+        constructor() {
+          this.aiPlayers = [];
+          this.aiDifficulty = 'medium';
+          this.gameMode = 'online'; // 'online' أو 'single'
+          this.gameStarted = false;
+          this.canClaimWin = false;
+          this.timerInterval = null;
+          this.state = {
+            playerId: this.generatePlayerId(),
+            playerName: localStorage.getItem('fruitClash_playerName') || 'لاعب',
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
+            isHost: false,
+            roomId: null,
+            players: {},
+            gameData: {
+              currentRound: 1, roundWinner: null, playersCards: {}, gameActive: false,
+              startTime: null, maxPlayers: 4, roundTime: 60,
+              fruits: ['🍎','🍌','🍊','🍇','🍓','🍉','🍒','🍍']
+            },
+            stats: null, connectionStatus: 'online'
+          };
+          this.fruitsNames = { '🍎':'تفاح','🍌':'موز','🍊':'برتقال','🍇':'عنب','🍓':'فراولة','🍉':'بطيخ','🍒':'كرز','🍍':'أناناس' };
+          this.init();
+        }
+
+        generatePlayerId() { return 'p_'+Math.random().toString(36).substr(2,9); }
+        generateRoomCode() { return Math.random().toString(36).substr(2,4).toUpperCase(); }
+
+        init() {
+          this.updatePlayerDisplay();
+          this.loadStats();
+          this.showScreen('main-menu');
+        }
+
+        getElement(id) { return document.getElementById(id); }
+        showScreen(screenName) {
+          document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+          const el = this.getElement(screenName+'-screen');
+          if (el) el.classList.remove('hidden');
+        }
+
+        showNotification(msg, type='info') {
+          const toast = this.getElement('toast');
+          toast.textContent = msg;
+          toast.className = 'toast-message show toast-'+type;
+          setTimeout(()=> toast.classList.remove('show'), 2000);
+        }
+
+        updatePlayerDisplay() {
+          const nameEl = this.getElement('player-name-display');
+          if (nameEl) nameEl.textContent = this.state.playerName;
+          const avatarImg = this.getElement('menu-avatar');
+          if (avatarImg) avatarImg.src = this.state.avatar;
+          const sideAvatar = this.getElement('side-avatar');
+          if (sideAvatar) sideAvatar.src = this.state.avatar;
+          this.getElement('menu-player-name').textContent = this.state.playerName;
+        }
+
+        editName() {
+          let newName = prompt('أدخل اسمك الجديد', this.state.playerName);
+          if (newName && newName.trim()) {
+            this.state.playerName = newName.trim().slice(0,24);
+            localStorage.setItem('fruitClash_playerName', this.state.playerName);
+            this.updatePlayerDisplay();
+          }
+        }
+
+        // ===== وضع الفردي ضد الذكاء الاصطناعي =====
+        startSinglePlayer() {
+          this.gameMode = 'single';
+          this.aiPlayers = [];
+          this.state.roomId = 'single_'+Date.now();
+          this.state.isHost = true;
+          this.state.players = {};
+          this.ensureSelfInPlayers(true);
+          // إضافة 3 روبوتات
+          for (let i=1; i<=3; i++) {
+            let aiId = 'ai_'+i+'_'+Date.now();
+            this.aiPlayers.push(aiId);
+            this.state.players[aiId] = {
+              name: 'روبوت '+i, avatar: `https://api.dicebear.com/7.x/robots/svg?seed=ai${i}`,
+              isHost: false, isAI: true, joinedAt: new Date().toISOString()
+            };
+          }
+          this.showScreen('lobby');
+          this.updateLobbyDisplay();
+          this.showNotification('🎮 بدء اللعب ضد الذكاء الاصطناعي', 'success');
+        }
+
+        setAIDifficulty(level) { this.aiDifficulty = level; this.closeDifficultyModal(); this.startSinglePlayer(); }
+
+        // ===== إدارة اللوبي =====
+        ensureSelfInPlayers(asHost) {
+          this.state.players[this.state.playerId] = {
+            name: this.state.playerName, avatar: this.state.avatar,
+            isHost: asHost, isAI: false, joinedAt: new Date().toISOString()
+          };
+        }
+
+        updateLobbyDisplay() {
+          const playersGrid = this.getElement('players-grid');
+          if (!playersGrid) return;
+          playersGrid.innerHTML = '';
+          const playersArray = Object.entries(this.state.players).map(([id,p])=>({id,...p}));
+          playersArray.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'player-card' + (p.isHost ? ' host-card' : '');
+            card.innerHTML = `<div class="player-avatar small"><img src="${p.avatar}" alt=""></div><div class="player-name">${p.name}</div>${p.isAI ? '<div class="player-badge"><i class="fas fa-robot"></i> روبوت</div>' : ''}`;
+            playersGrid.appendChild(card);
+          });
+          for (let i=playersArray.length; i<4; i++) {
+            playersGrid.innerHTML += '<div class="player-card empty-card"><div class="empty-icon"><i class="fas fa-user-plus"></i></div><div class="empty-text">انتظار...</div></div>';
+          }
+          this.getElement('player-count').textContent = playersArray.length+'/4';
+          const startBtn = this.getElement('start-game-btn');
+          if (this.gameMode==='single' || (this.state.isHost && playersArray.length>=2)) {
+            startBtn.classList.remove('disabled'); startBtn.disabled = false;
+            startBtn.onclick = ()=> this.startGame();
+          } else { startBtn.classList.add('disabled'); startBtn.disabled = true; }
+
+          if (this.state.roomId && this.state.roomId.startsWith('single')) {
+            this.getElement('room-code').textContent = '🤖 AI';
+          } else if (this.state.roomId) {
+            this.getElement('room-code').textContent = this.state.roomId;
+            this.generateQRCode();
+          }
+        }
+
+        startGame() {
+          this.showScreen('game');
+          this.initializeRound(true);
+        }
+
+        initializeRound(resetRound=true) {
+          if (resetRound) this.state.gameData.currentRound = 1;
+          this.state.gameData.gameActive = true;
+          this.state.gameData.roundWinner = null;
+          this.state.gameData.startTime = Date.now();
+          this.state.gameData.playersCards = {};
+          this.gameStarted = true; this.canClaimWin = false;
+          this.dealCards();
+          setTimeout(()=> { if (this.state.gameData.gameActive) { this.canClaimWin = true; this.updateWinButtonState(); } }, 2000);
+          this.startTimer(this.state.gameData.roundTime);
+          this.updateGameUI();
+          if (this.gameMode === 'single') this.startAIThinking();
+        }
+
+        dealCards() {
+          const fruits = this.state.gameData.fruits;
+          for (let pid in this.state.players) {
+            let cards = [];
+            for (let i=0; i<4; i++) {
+              let fruit = fruits[Math.floor(Math.random()*fruits.length)];
+              cards.push({ emoji: fruit, name: this.fruitsNames[fruit] });
+            }
+            this.state.gameData.playersCards[pid] = cards;
+          }
+        }
+
+        updateGameUI() {
+          const myCards = this.state.gameData.playersCards[this.state.playerId] || [];
+          const container = this.getElement('cards-container');
+          container.innerHTML = '';
+          myCards.forEach((card, idx) => {
+            container.innerHTML += `<div class="modern-card" onclick="window.game?.selectCard(${idx})"><div class="card-emoji">${card.emoji}</div><div class="card-name">${card.name}</div><div class="card-index">${idx+1}</div></div>`;
+          });
+          this.getElement('cards-count').textContent = myCards.length+'/4';
+          this.updateWinButtonState();
+          this.updatePlayersProgress();
+        }
+
+        updatePlayersProgress() {
+          const progressDiv = this.getElement('players-progress');
+          progressDiv.innerHTML = '';
+          Object.entries(this.state.players).forEach(([pid, p]) => {
+            let cards = this.state.gameData.playersCards[pid] || [];
+            let counts = cards.reduce((acc,c)=> { acc[c.emoji]=(acc[c.emoji]||0)+1; return acc; }, {});
+            let maxCount = Math.max(...Object.values(counts),0);
+            let percent = (maxCount/4)*100;
+            let isAI = p.isAI ? 'ai-player' : '';
+            progressDiv.innerHTML += `<div class="player-progress-item ${isAI}"><div class="progress-avatar"><img src="${p.avatar}"></div><div class="progress-name">${p.name}</div><div class="progress-bar-container"><div class="progress-bar" style="width:${percent}%"></div></div><div class="progress-count">${maxCount}/4</div></div>`;
+          });
+        }
+
+        updateWinButtonState() {
+          const btn = this.getElement('done-button');
+          if (!this.state.gameData.gameActive || this.state.gameData.roundWinner) { btn.classList.add('disabled'); btn.disabled = true; return; }
+          if (this.canClaimWin) { btn.classList.remove('disabled'); btn.disabled = false; } 
+          else { btn.classList.add('disabled'); btn.disabled = true; }
+        }
+
+        claimWin() {
+          if (!this.canClaimWin) return this.showNotification('⏳ انتظر قليلاً...','warning');
+          if (!this.state.gameData.gameActive || this.state.gameData.roundWinner) return;
+          const myCards = this.state.gameData.playersCards[this.state.playerId];
+          const counts = myCards.reduce((acc,c)=>{ acc[c.emoji]=(acc[c.emoji]||0)+1; return acc; }, {});
+          if (!Object.values(counts).some(v=>v>=4)) return this.showNotification('❌ ليس لديك 4 متطابقة','error');
+          this.handleWin(this.state.playerId);
+        }
+
+        handleWin(pid) {
+          this.state.gameData.roundWinner = pid;
+          this.state.gameData.gameActive = false;
+          this.stopTimer();
+          let winTime = Math.floor((Date.now()-this.state.gameData.startTime)/1000);
+          if (pid === this.state.playerId) this.updateStats('win', winTime);
+          else if (this.gameMode==='single') this.updateStats('loss', winTime);
+          this.showWinnerModal(pid, winTime);
+          confetti({particleCount:150, spread:70, origin:{y:0.6}});
+        }
+
+        showWinnerModal(winnerId, time) {
+          let winner = this.state.players[winnerId] || { name:'لاعب', avatar:'' };
+          this.getElement('winner-avatar-img').src = winner.avatar;
+          this.getElement('result-title').textContent = winnerId===this.state.playerId ? '🥳 أنت الفائز!' : '🏆 الفائز';
+          this.getElement('result-message').textContent = winnerId===this.state.playerId ? 'أحسنت! جمعت 4 بطاقات' : `${winner.name} فاز بالجولة`;
+          this.getElement('round-time').textContent = time;
+          this.getElement('win-streak').textContent = this.state.stats?.winStreak || 0;
+          this.getElement('result-modal').classList.remove('hidden');
+        }
+
+        nextRound() {
+          this.getElement('result-modal').classList.add('hidden');
+          this.state.gameData.currentRound++;
+          this.initializeRound(false);
+        }
+
+        endGame() { this.getElement('result-modal').classList.add('hidden'); this.leaveRoom(); }
+
+        shuffleMyCards() {
+          if (!this.state.gameData.gameActive) return;
+          let myCards = this.state.gameData.playersCards[this.state.playerId];
+          for (let i=myCards.length-1; i>0; i--) {
+            const j = Math.floor(Math.random()*(i+1)); [myCards[i],myCards[j]] = [myCards[j],myCards[i]];
+          }
+          this.updateGameUI();
+        }
+
+        sortMyCards() {
+          if (!this.state.gameData.gameActive) return;
+          let myCards = this.state.gameData.playersCards[this.state.playerId];
+          myCards.sort((a,b)=> a.emoji.localeCompare(b.emoji));
+          this.updateGameUI();
+        }
+
+        startTimer(seconds) {
+          this.stopTimer();
+          const timerEl = this.getElement('game-timer');
+          const progress = this.getElement('timer-progress');
+          let timeLeft = seconds;
+          timerEl.textContent = timeLeft;
+          const circumference = 283;
+          this.timerInterval = setInterval(()=>{
+            timeLeft--;
+            timerEl.textContent = timeLeft;
+            let offset = circumference * (1 - timeLeft/seconds);
+            if (progress) progress.style.strokeDashoffset = offset;
+            if (timeLeft<=0) {
+              this.stopTimer();
+              if (this.state.gameData.gameActive && !this.state.gameData.roundWinner) {
+                this.handleTimeout();
+              }
+            }
+          },1000);
+        }
+
+        stopTimer() { if (this.timerInterval) clearInterval(this.timerInterval); }
+
+        handleTimeout() {
+          this.showNotification('⏰ انتهى الوقت!','warning');
+          this.state.gameData.gameActive = false;
+        }
+
+        // AI منطق (محاكاة ذكاء)
+        startAIThinking() {
+          if (this.gameMode!=='single') return;
+          const aiIds = this.aiPlayers.filter(id => !this.state.gameData.playersCards[id]?.some(c=>Object.values(c).length));
+          aiIds.forEach(aiId => {
+            setTimeout(()=>{
+              if (!this.state.gameData.gameActive || this.state.gameData.roundWinner) return;
+              let cards = this.state.gameData.playersCards[aiId];
+              let counts = cards.reduce((acc,c)=>{ acc[c.emoji]=(acc[c.emoji]||0)+1; return acc; }, {});
+              let maxCount = Math.max(...Object.values(counts));
+              if (maxCount>=4) this.handleWin(aiId);
+            }, 1500 + Math.random()*2000);
+          });
+        }
+
+        loadStats() {
+          let saved = localStorage.getItem('fruitClash_stats');
+          this.state.stats = saved ? JSON.parse(saved) : {wins:0, gamesPlayed:0, winStreak:0, fastestWin:null};
+          return this.state.stats;
+        }
+        updateStats(type, val) {
+          if (!this.state.stats) this.loadStats();
+          if (type==='win') { this.state.stats.wins++; this.state.stats.winStreak++; this.state.stats.gamesPlayed++;
+            if (!this.state.stats.fastestWin || val<this.state.stats.fastestWin) this.state.stats.fastestWin=val; }
+          else if (type==='loss') { this.state.stats.winStreak=0; this.state.stats.gamesPlayed++; }
+          localStorage.setItem('fruitClash_stats', JSON.stringify(this.state.stats));
+        }
+
+        // دوال الغرفة (online مبسطة)
+        createRoom() {
+          this.gameMode='online'; this.aiPlayers=[];
+          this.state.isHost=true; this.state.roomId=this.generateRoomCode();
+          this.state.players={}; this.ensureSelfInPlayers(true);
+          this.showScreen('lobby'); this.generateQRCode(); this.updateLobbyDisplay(); this.showNotification('تم إنشاء الغرفة','success');
+        }
+        joinRoom(roomCode) { this.showNotification('محاكاة انضمام (تطوير)','info'); }
+        showJoinDialog() { let code=prompt('أدخل رمز الغرفة'); if(code) this.joinRoom(code); }
+        copyRoomCode() { let code=this.getElement('room-code').textContent; navigator.clipboard?.writeText(code); this.showNotification('تم النسخ!','success'); }
+        generateQRCode() {
+          if (this.state.roomId && this.state.roomId!=='----' && !this.state.roomId.startsWith('single')) {
+            QRCode.toCanvas(this.getElement('qr-code'), window.location.origin+'?join='+this.state.roomId, {width:150}, (e)=>e && console.log(e));
+          }
+        }
+        leaveRoom() {
+          this.state.roomId=null; this.state.players={}; this.aiPlayers=[]; this.stopTimer(); this.showScreen('main-menu');
+          this.showNotification('👋 رجوع للقائمة','info');
+        }
+        showSideMenu() { this.getElement('side-menu').classList.remove('hidden'); }
+        closeSideMenu() { this.getElement('side-menu').classList.add('hidden'); }
+        showHowToPlay() { this.showNotification('اجمع 4 بطاقات متطابقة للفوز!','info'); }
+        showStatsModal() { let s=this.state.stats; this.showNotification(`🏆 الفوز: ${s.wins} | 🔥 متتالي: ${s.winStreak}`,'info'); }
+        shareApp() { navigator.share?.({title:'Fruit Clash',text:'لعبة الفواكه'}) || this.copyRoomCode(); }
+        showSettings() { this.showNotification('⚙️ الإعدادات قريباً','info'); }
+        showTutorial() { this.showNotification('شرح اللعبة: 4 بطاقات متطابقة = فوز!','info'); }
+        quickJoinRandom() { this.createRoom(); }
+        showLeaderboardModal() { this.getElement('leaderboard-modal').classList.remove('hidden'); }
+        closeLeaderboardModal() { this.getElement('leaderboard-modal').classList.add('hidden'); }
+        closeDifficultyModal() { this.getElement('difficulty-modal').classList.add('hidden'); }
+        selectCard(idx) { /* تفاعل إضافي */ }
+      }
+
+      window.game = new ModernGame();
+
+      // ربط الأزرار المتبقية
+      window.initializeGame = ()=> window.game;
+      window.goBack = ()=> window.game.leaveRoom();
+      window.copyRoomCode = ()=> window.game.copyRoomCode();
+      window.showGameMenu = ()=> window.game.showSideMenu();
+      window.closeSideMenu = ()=> window.game.closeSideMenu();
+      window.quickJoinRandom = ()=> window.game.quickJoinRandom();
+      window.openTutorial = ()=> window.game.showTutorial();
+      window.showStats = ()=> window.game.showStatsModal();
+      window.leaveGame = ()=> { if(confirm('مغادرة؟')) window.game.leaveRoom(); };
+      window.shareInvite = ()=> window.game.shareInvite();
+      window.showSettings = ()=> window.game.showSettings();
+      window.showHowToPlay = ()=> window.game.showHowToPlay();
+      window.shareApp = ()=> window.game.shareApp();
+      window.showLeaderboard = ()=> window.game.showLeaderboardModal();
+      window.closeLeaderboard = ()=> window.game.closeLeaderboardModal();
+    })();
+  </script>
+</body>
+</html>
